@@ -15,5 +15,5 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 
-add_executable(test SPMRenc.cpp)
+add_executable(test SPMRenc.cpp CUP.cpp codingunits.cpp main.cpp)
 

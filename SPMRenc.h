@@ -1,7 +1,10 @@
 #pragma once
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <exception>
+
+#define MAX_Lref 2046
 class MR_enc;  // forward declaration for friend function termSPandMR()
 /********************************************************************************
  * SP_enc: state classe for HT SigProp encoding
@@ -39,7 +42,7 @@ class SP_enc {
       pos++;  // this prevents the appearance of a terminal 0xFF
     }
   }
-  uint32_t getPos() { return pos; }
+  [[nodiscard]] uint32_t get_length() const { return pos; }
   void show() {
     for (int i = 0; i < pos; ++i) {
       printf("%02x ", buf[i]);
@@ -60,7 +63,7 @@ class MR_enc {
   friend int32_t termSPandMR(SP_enc &, MR_enc &);
 
  public:
-  MR_enc(uint8_t *Dref) : pos(0), bits(0), tmp(0), last(255), buf(Dref) {}
+  MR_enc(uint8_t *Dref) : pos(MAX_Lref), bits(0), tmp(0), last(255), buf(Dref) {}
   void emitMRBit(uint8_t bit) {
     tmp |= (bit << bits);
     bits++;
@@ -69,42 +72,21 @@ class MR_enc {
     }
     if (bits == 8) {
       buf[pos] = tmp;
-      pos++;
+      pos--;  // MR buf gorws reverse order
       last = tmp;
       tmp  = 0;
       bits = 0;
     }
   }
-  uint32_t getPos() { return pos; }
+  [[nodiscard]] uint32_t get_length() const { return MAX_Lref - pos; }
   void show() {
-    for (int i = 0; i < pos; ++i) {
+    for (int i = MAX_Lref; i > pos; --i) {
       printf("%02x ", buf[i]);
     }
     printf("\n");
   }
 };
 
-int32_t termSPandMR(SP_enc &SP, MR_enc &MR) {
-  uint8_t SP_mask = 0xFF >> (8 - SP.bits);  // if SP_bits is 0, SP_mask = 0
-  SP_mask |= ((1 << SP.max) & 0x80);        // Auguments SP_mask to cover any stuff bit
-  uint8_t MR_mask = 0xFF >> (8 - MR.bits);  // if MR_bits is 0, MR_mask = 0
-  if ((SP_mask | MR_mask) == 0) {
-    return 0;  // last SP byte cannot be 0xFF, since then SP_max would be 7
-  }
-  uint8_t fuse = SP.tmp | MR.tmp;
-  if ((((fuse ^ SP.tmp) & SP_mask) | ((fuse ^ MR.tmp) & MR_mask)) == 0) {
-    SP.buf[SP.pos] = fuse;  // fuse always < 0x80 here; no false marker risk
-  } else {
-    SP.buf[SP.pos] = SP.tmp;  // SP_tmp cannot be 0xFF
-    MR.buf[MR.pos] = MR.tmp;
-    MR.pos++;
-  }
-  SP.pos++;
-  for (int i = MR.pos - 1, j = 0; i >= 0; --i, ++j) {
-    SP.buf[SP.pos + j] = MR.buf[i];
-  }
-  return 1;
-}
 /********************************************************************************
  * SP_dec: state classe for HT SigProp decoding
  *******************************************************************************/
